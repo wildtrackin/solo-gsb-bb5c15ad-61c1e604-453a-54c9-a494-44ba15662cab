@@ -232,6 +232,60 @@ code {
 }
 .empty-state .big { font-size: 34px; display: block; margin-bottom: 8px; }
 
+/* 修复方案 */
+.fix-card {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  margin-bottom: 12px;
+}
+.fix-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.fix-title { font-size: 13px; font-weight: 700; color: var(--accent); }
+.fix-stats { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.7; }
+.fix-stats strong { color: var(--text); }
+.fix-stats strong.bad { color: var(--shadow); }
+.fix-stats strong.good { color: var(--ok); }
+
+.fix-moves { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.fix-moves-title { font-size: 11px; color: var(--muted); }
+.fix-move-row {
+  display: flex; gap: 10px; align-items: baseline;
+  font-family: var(--mono); font-size: 12.5px;
+  background: #0e1524; border: 1px solid var(--border);
+  border-radius: 7px; padding: 5px 9px;
+}
+.fix-move-row .pos { color: var(--accent); white-space: nowrap; font-weight: 700; }
+.fix-move-row .m { color: var(--accent); }
+.fix-move-row .p { color: var(--text); overflow-wrap: anywhere; }
+
+.fix-groups {
+  margin-top: 10px;
+  border: 1px dashed rgba(255,107,107,.5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--shadow-bg);
+}
+.fix-groups-title { font-size: 11px; color: var(--shadow); font-weight: 700; }
+.fix-group-row {
+  font-family: var(--mono); font-size: 12.5px; margin-top: 5px;
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline;
+}
+.fix-group-row .eq { color: var(--shadow); font-weight: 700; }
+
+.fix-actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fix-note { font-size: 11px; color: var(--muted); }
+
+/* 预览模式 */
+.rules-panel.previewing { border-color: var(--accent); }
+.rule-row.preview-row { cursor: default; }
+.rule-row.preview-moved { border-color: var(--accent); }
+.preview-method { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+.preview-path { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+.preview-move { font-size: 11px; color: var(--muted); }
+.preview-move.moved { color: var(--accent); font-weight: 700; }
+
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   background: #24304a; border: 1px solid var(--border);

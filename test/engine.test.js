@@ -185,4 +185,129 @@ check('analyze: 默认实验室示例集结果稳定', () => {
   assert.strictEqual(overlap56.example, 'GET /a/b/c');
 });
 
+// ---------- 修复方案（fix） ----------
+check('fix: 严格覆盖链重排为确定性拓扑序', () => {
+  const res = analyze([
+    { id: 'a', method: 'GET', path: '/api/*' },
+    { id: 'b', method: 'GET', path: '/api/users/*' },
+    { id: 'c', method: 'GET', path: '/api/users/:id' },
+  ]);
+  assert.deepStrictEqual(res.fix.order, [2, 1, 0]);
+  assert.strictEqual(res.fix.changed, true);
+  assert.strictEqual(res.fix.shadowsBefore, 3);
+  assert.strictEqual(res.fix.fixableShadows, 3);
+  assert.strictEqual(res.fix.unavoidableShadows, 0);
+  const moveMap = new Map(res.fix.moves.map((m) => [m.id, [m.from, m.to]]));
+  assert.deepStrictEqual(moveMap.get('a'), [0, 2]);
+  assert.deepStrictEqual(moveMap.get('c'), [2, 0]);
+  assert.strictEqual(moveMap.has('b'), false, '中间规则位置不变，不应出现在 moves 中');
+});
+
+check('fix: 应用建议顺序后遮蔽数降为不可避免值', () => {
+  const rules = [
+    { method: 'GET', path: '/api/*' },
+    { method: 'GET', path: '/api/users/*' },
+    { method: 'GET', path: '/api/users/:id' },
+    { method: 'GET', path: '/assets/*' },
+    { method: 'GET', path: '/assets/css/*' },
+    { method: 'GET', path: '/a/*/c' },
+    { method: 'GET', path: '/*/b/c' },
+    { method: 'POST', path: '/api/users' },
+  ];
+  const before = analyze(rules);
+  assert.strictEqual(before.summary.shadow, 4);
+  const reordered = before.fix.order.map((i) => rules[i]);
+  const after = analyze(reordered);
+  assert.strictEqual(after.summary.shadow, before.fix.unavoidableShadows);
+  assert.strictEqual(after.summary.shadow, 0);
+});
+
+check('fix: 语言等价的规则标记为不可通过排序消除', () => {
+  const res = analyze([
+    { id: 'a', method: 'GET', path: '/x/:id' },
+    { id: 'b', method: 'GET', path: '/x/:name' },
+    { id: 'c', method: 'GET', path: '/y' },
+  ]);
+  assert.strictEqual(res.summary.shadow, 1);
+  assert.strictEqual(res.fix.unavoidableShadows, 1);
+  assert.strictEqual(res.fix.fixableShadows, 0);
+  assert.strictEqual(res.fix.changed, false, '等价规则无法靠排序修复，不应给出移动');
+  assert.strictEqual(res.fix.equivalentGroups.length, 1);
+  assert.deepStrictEqual(
+    res.fix.equivalentGroups[0].members.map((m) => m.id),
+    ['a', 'b']
+  );
+});
+
+check('fix: 等价组与严格覆盖混合场景', () => {
+  const res = analyze([
+    { id: 'gen', method: 'GET', path: '/x/*' },
+    { id: 'e1', method: 'GET', path: '/x/:a' },
+    { id: 'e2', method: 'GET', path: '/x/:b' },
+  ]);
+  // gen 遮蔽 e1、e2（可修复）；e1 ≡ e2 互相遮蔽（不可消除）
+  assert.strictEqual(res.fix.shadowsBefore, 3);
+  assert.strictEqual(res.fix.unavoidableShadows, 1);
+  assert.strictEqual(res.fix.fixableShadows, 2);
+  // 等价组 {e1,e2} 整体移到 gen 前，组内保持原相对顺序
+  assert.deepStrictEqual(res.fix.order, [1, 2, 0]);
+});
+
+check('fix: 不同方法的等价规则不计入不可避免遮蔽', () => {
+  const res = analyze([
+    { method: 'GET', path: '/x/:a' },
+    { method: 'POST', path: '/x/:b' },
+  ]);
+  assert.strictEqual(res.summary.total, 0);
+  assert.strictEqual(res.fix.unavoidableShadows, 0);
+  assert.strictEqual(res.fix.changed, false);
+});
+
+check('fix: ALL 与具体方法的等价规则计入不可避免遮蔽', () => {
+  const res = analyze([
+    { method: 'ALL', path: '/x/:a' },
+    { method: 'GET', path: '/x/:b' },
+  ]);
+  assert.strictEqual(res.fix.unavoidableShadows, 1);
+  assert.strictEqual(res.fix.equivalentGroups.length, 1);
+});
+
+check('fix: 约束已满足时保持原顺序', () => {
+  const res = analyze([
+    { method: 'GET', path: '/a' },
+    { method: 'GET', path: '/b' },
+    { method: 'GET', path: '/*' },
+  ]);
+  // /* 位于最后，未遮蔽任何人；拓扑排序不改变已满足约束的相对顺序
+  assert.strictEqual(res.summary.shadow, 0);
+  assert.deepStrictEqual(res.fix.order, [0, 1, 2]);
+  assert.strictEqual(res.fix.changed, false);
+});
+
+check('fix: 无效规则固定在原槽位', () => {
+  const res = analyze([
+    { id: 'x', method: 'GET', path: '/a/*' },
+    { id: 'bad', method: 'GET', path: 'no-slash' },
+    { id: 'y', method: 'GET', path: '/a/b' },
+  ]);
+  assert.strictEqual(res.fix.order.length, 3);
+  assert.strictEqual(res.fix.order[0], 2, '更具体的 y 移到最前');
+  assert.strictEqual(res.fix.order[1], 1, '无效规则留在原槽位');
+  assert.strictEqual(res.fix.order[2], 0);
+});
+
+check('fix: 确定性——重复分析结果完全一致', () => {
+  const rules = [
+    { method: 'GET', path: '/*' },
+    { method: 'GET', path: '/a/*' },
+    { method: 'GET', path: '/a/b' },
+    { method: 'GET', path: '/c/:p' },
+  ];
+  const r1 = analyze(rules);
+  const r2 = analyze(rules);
+  assert.deepStrictEqual(r1.fix, r2.fix);
+  // /a/b、/a/* 须移到 /* 前；/c/:p 与 /a 组无约束，保持相对位置
+  assert.deepStrictEqual(r1.fix.order, [2, 1, 3, 0]);
+});
+
 console.log(`\n全部 ${passed} 个测试通过。`);

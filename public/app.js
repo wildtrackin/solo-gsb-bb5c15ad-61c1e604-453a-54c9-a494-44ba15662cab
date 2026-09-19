@@ -22,12 +22,15 @@ const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'AL
 const listEl = document.getElementById('rules-list');
 const conflictsEl = document.getElementById('conflicts');
 const summaryEl = document.getElementById('summary');
+const fixEl = document.getElementById('fix-plan');
 const toastEl = document.getElementById('toast');
+const rulesPanelEl = document.querySelector('.rules-panel');
 
 let rules = loadRules();
 let dragIndex = null;
 let lastAnalysis = null;
 let debounceTimer = null;
+let previewOrder = null; // 非 null 表示正在预览修复方案的建议顺序
 
 function loadRules() {
   try {
@@ -68,6 +71,7 @@ function showToast(msg, kind = '') {
 /* ---------------- 规则列表渲染 ---------------- */
 
 function renderRules() {
+  rulesPanelEl.classList.remove('previewing');
   listEl.innerHTML = '';
   rules.forEach((rule, i) => {
     const li = document.createElement('li');
@@ -214,6 +218,7 @@ async function analyze() {
     paintAnalysis();
   } catch (err) {
     summaryEl.innerHTML = '';
+    fixEl.innerHTML = '';
     conflictsEl.innerHTML =
       `<div class="empty-state">分析失败：${escapeHTML(err.message)}</div>`;
   }
@@ -221,7 +226,7 @@ async function analyze() {
 
 function paintAnalysis() {
   if (!lastAnalysis) return;
-  const { rules: results, conflicts, summary } = lastAnalysis;
+  const { rules: results, conflicts, summary, fix } = lastAnalysis;
 
   // 行高亮 + 状态徽标
   listEl.querySelectorAll('.rule-row').forEach((row) => {
@@ -273,6 +278,9 @@ function paintAnalysis() {
     summaryEl.appendChild(pill('pill-ok', '无冲突', ''));
   }
 
+  // 修复方案（建议顺序）
+  renderFixPlan(fix);
+
   // 冲突卡片
   conflictsEl.innerHTML = '';
   if (conflicts.length === 0) {
@@ -283,6 +291,199 @@ function paintAnalysis() {
   for (const c of conflicts) {
     conflictsEl.appendChild(renderConflictCard(c));
   }
+}
+
+/* ---------------- 修复方案（建议顺序） ---------------- */
+
+function strongNum(text, cls) {
+  const s = document.createElement('strong');
+  if (cls) s.className = cls;
+  s.textContent = text;
+  return s;
+}
+
+function renderFixPlan(fix) {
+  fixEl.innerHTML = '';
+  if (!fix || fix.shadowsBefore === 0) return;
+
+  const card = document.createElement('div');
+  card.className = 'fix-card';
+
+  const head = document.createElement('div');
+  head.className = 'fix-head';
+  const title = document.createElement('span');
+  title.className = 'fix-title';
+  title.textContent = '🛠 修复方案（重新排序）';
+  head.appendChild(title);
+  card.appendChild(head);
+
+  // 统计：可修复 / 不可避免
+  const stats = document.createElement('div');
+  stats.className = 'fix-stats';
+  const line1 = document.createElement('div');
+  line1.append('当前 ', strongNum(String(fix.shadowsBefore), 'bad'), ' 处完全遮蔽。');
+  stats.appendChild(line1);
+  const line2 = document.createElement('div');
+  if (fix.fixableShadows > 0) {
+    line2.append(strongNum(String(fix.fixableShadows), 'good'), ' 处可通过调整顺序修复');
+    if (fix.unavoidableShadows > 0) {
+      line2.append(
+        '，另有 ',
+        strongNum(String(fix.unavoidableShadows), 'bad'),
+        ' 处由语言等价的规则导致，无法通过排序消除。'
+      );
+    } else {
+      line2.append('，调整后不再存在完全遮蔽。');
+    }
+  } else {
+    line2.append(
+      strongNum(String(fix.unavoidableShadows), 'bad'),
+      ' 处遮蔽由语言等价的规则导致，无法通过排序消除（需删除或修改重复规则）。'
+    );
+  }
+  stats.appendChild(line2);
+  card.appendChild(stats);
+
+  // 位置变化明细（调整前 → 调整后）
+  if (fix.changed) {
+    const movesBox = document.createElement('div');
+    movesBox.className = 'fix-moves';
+    const mt = document.createElement('div');
+    mt.className = 'fix-moves-title';
+    mt.textContent = `建议调整（${fix.moves.length} 条规则位置变化，#调整前 → #调整后）：`;
+    movesBox.appendChild(mt);
+    for (const mv of fix.moves) {
+      const row = document.createElement('div');
+      row.className = 'fix-move-row';
+      const pos = document.createElement('span');
+      pos.className = 'pos';
+      pos.textContent = `#${mv.from + 1} → #${mv.to + 1}`;
+      const m = document.createElement('span');
+      m.className = 'm';
+      m.textContent = mv.method;
+      const p = document.createElement('span');
+      p.className = 'p';
+      p.textContent = mv.path;
+      row.append(pos, m, p);
+      movesBox.appendChild(row);
+    }
+    card.appendChild(movesBox);
+  }
+
+  // 等价组：无法通过排序消除，如实标注
+  if (fix.equivalentGroups.length > 0) {
+    const box = document.createElement('div');
+    box.className = 'fix-groups';
+    const gt = document.createElement('div');
+    gt.className = 'fix-groups-title';
+    gt.textContent =
+      '⚠ 以下规则路径语言等价，无论如何排序都互相遮蔽，需删除或修改重复规则：';
+    box.appendChild(gt);
+    for (const g of fix.equivalentGroups) {
+      const row = document.createElement('div');
+      row.className = 'fix-group-row';
+      g.members.forEach((mb, mi) => {
+        if (mi > 0) {
+          const eq = document.createElement('span');
+          eq.className = 'eq';
+          eq.textContent = '≡';
+          row.appendChild(eq);
+        }
+        const item = document.createElement('span');
+        item.textContent = `#${mb.index + 1} ${mb.method} ${mb.path}`;
+        row.appendChild(item);
+      });
+      box.appendChild(row);
+    }
+    card.appendChild(box);
+  }
+
+  // 操作区：预览 -> 一次应用
+  if (fix.changed) {
+    const actions = document.createElement('div');
+    actions.className = 'fix-actions';
+    if (previewOrder === null) {
+      const previewBtn = document.createElement('button');
+      previewBtn.className = 'btn';
+      previewBtn.type = 'button';
+      previewBtn.textContent = '👁 预览新顺序';
+      previewBtn.addEventListener('click', () => {
+        previewOrder = lastAnalysis.fix.order.slice();
+        renderPreview();
+        renderFixPlan(lastAnalysis.fix);
+      });
+      actions.appendChild(previewBtn);
+    } else {
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'btn btn-primary';
+      applyBtn.type = 'button';
+      applyBtn.textContent = '✔ 应用新顺序';
+      applyBtn.addEventListener('click', applyPreview);
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn btn-ghost';
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = '取消预览';
+      cancelBtn.addEventListener('click', cancelPreview);
+      const note = document.createElement('span');
+      note.className = 'fix-note';
+      note.textContent = '左侧列表为建议顺序预览，应用后将重新分析并保存。';
+      actions.append(applyBtn, cancelBtn, note);
+    }
+    card.appendChild(actions);
+  }
+
+  fixEl.appendChild(card);
+}
+
+/** 预览模式：规则列表按建议顺序静态渲染，并标注调整前位置 */
+function renderPreview() {
+  rulesPanelEl.classList.add('previewing');
+  listEl.innerHTML = '';
+  previewOrder.forEach((oldIdx, newIdx) => {
+    const rule = rules[oldIdx];
+    const li = document.createElement('li');
+    li.className = 'rule-row preview-row';
+    if (oldIdx !== newIdx) li.classList.add('preview-moved');
+
+    const grip = document.createElement('span');
+    grip.className = 'grip';
+
+    const idx = document.createElement('span');
+    idx.className = 'idx';
+    idx.textContent = newIdx + 1;
+
+    const method = document.createElement('span');
+    method.className = 'preview-method';
+    method.textContent = (rule.method || 'GET').toUpperCase();
+
+    const path = document.createElement('span');
+    path.className = 'preview-path';
+    path.textContent = rule.path;
+
+    const move = document.createElement('span');
+    move.className = 'preview-move' + (oldIdx !== newIdx ? ' moved' : '');
+    move.textContent = oldIdx !== newIdx ? `原位置 #${oldIdx + 1}` : '位置不变';
+
+    li.append(grip, idx, method, path, move, document.createElement('span'));
+    listEl.appendChild(li);
+  });
+}
+
+function cancelPreview() {
+  if (previewOrder === null) return;
+  previewOrder = null;
+  renderRules();
+}
+
+/** 一次应用：按建议顺序重排，沿用现有实时分析与本地保存 */
+function applyPreview() {
+  if (previewOrder === null) return;
+  rules = previewOrder.map((i) => rules[i]);
+  previewOrder = null;
+  saveRules();
+  renderRules();
+  scheduleAnalyze(true);
+  showToast('已应用建议顺序', 'ok');
 }
 
 function badgeEl(kind, text) {
@@ -360,6 +561,7 @@ function escapeHTML(s) {
 /* ---------------- 导入 / 导出 / 新增 / 重置 ---------------- */
 
 document.getElementById('btn-add').addEventListener('click', () => {
+  cancelPreview();
   rules.push({ method: 'GET', path: '/new/route/:id' });
   saveRules();
   renderRules();
@@ -371,6 +573,7 @@ document.getElementById('btn-add').addEventListener('click', () => {
 });
 
 document.getElementById('btn-reset').addEventListener('click', () => {
+  cancelPreview();
   rules = DEFAULT_RULES.map((r) => ({ ...r }));
   saveRules();
   renderRules();
@@ -397,6 +600,7 @@ document.getElementById('btn-export').addEventListener('click', () => {
 });
 
 document.getElementById('btn-import').addEventListener('click', () => {
+  cancelPreview();
   document.getElementById('file-import').click();
 });
 
