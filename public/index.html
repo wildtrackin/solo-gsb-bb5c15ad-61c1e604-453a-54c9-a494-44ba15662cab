@@ -52,8 +52,12 @@
     <section class="panel result-panel">
       <div class="panel-head">
         <h2>冲突分析结果</h2>
-        <div id="summary" class="summary"></div>
+        <div class="head-right">
+          <div id="summary" class="summary"></div>
+          <button id="btn-fix" class="btn btn-fix" type="button" hidden>🛠 生成修复方案</button>
+        </div>
       </div>
+      <div id="fix-plan" class="fix-plan" hidden></div>
       <div id="conflicts" class="conflicts"></div>
       <div id="toast" class="toast" hidden></div>
     </section>

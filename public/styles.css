@@ -181,6 +181,13 @@ code {
 }
 
 .summary { display: flex; gap: 8px; }
+.head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-fix {
+  background: rgba(91, 140, 255, 0.14);
+  border-color: rgba(91, 140, 255, 0.6);
+  color: #a8c0ff;
+}
+.btn-fix:hover { background: rgba(91, 140, 255, 0.24); }
 .summary .pill {
   font-size: 12px; padding: 3px 10px; border-radius: 99px;
   border: 1px solid var(--border); color: var(--muted);
@@ -240,3 +247,83 @@ code {
 }
 .toast.error { border-color: var(--invalid); color: #ffb3b4; }
 .toast.ok { border-color: var(--ok); color: #9bf0bf; }
+
+/* ---------------- 修复方案面板 ---------------- */
+.fix-plan {
+  border: 1px solid rgba(91, 140, 255, 0.45);
+  background: linear-gradient(180deg, rgba(91, 140, 255, 0.08), rgba(91, 140, 255, 0.03));
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.fix-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.fix-title { font-size: 13.5px; font-weight: 700; color: #a8c0ff; }
+
+.fix-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.fix-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--panel-2); padding: 6px 14px; min-width: 92px;
+}
+.fix-stat-n { font-size: 19px; font-weight: 700; font-family: var(--mono); line-height: 1.2; }
+.fix-stat-label { font-size: 11px; color: var(--muted); }
+.stat-before .fix-stat-n { color: var(--shadow); }
+.stat-after .fix-stat-n { color: var(--ok); }
+.stat-unavoid .fix-stat-n { color: var(--partial); }
+.stat-move .fix-stat-n { color: var(--accent); }
+
+.fix-verdict {
+  font-size: 12.5px; line-height: 1.7; border-radius: 8px;
+  padding: 8px 11px; margin-bottom: 12px;
+}
+.fix-verdict.fv-ok { background: rgba(46, 204, 113, 0.1); color: #9bf0bf; border: 1px solid rgba(46, 204, 113, 0.35); }
+.fix-verdict.fv-warn { background: rgba(245, 165, 36, 0.1); color: #ffd88f; border: 1px solid rgba(245, 165, 36, 0.4); }
+
+.fix-section-label { font-size: 11.5px; color: var(--muted); margin: 4px 0 6px; letter-spacing: .3px; }
+.fix-section-label.label-danger { color: var(--partial); font-weight: 700; }
+
+.fix-order {
+  background: #0e1524; border: 1px solid var(--border); border-radius: 9px;
+  padding: 9px 11px; margin-bottom: 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.fix-order-row {
+  display: grid;
+  grid-template-columns: 30px 64px minmax(60px, 0.7fr) minmax(0, 2.3fr);
+  gap: 8px; align-items: baseline;
+  font-family: var(--mono); font-size: 12.5px;
+}
+.fix-new-no {
+  text-align: center; font-weight: 700; color: var(--accent);
+  background: rgba(91, 140, 255, 0.12); border-radius: 6px; font-size: 12px;
+}
+.fix-move { color: var(--partial); font-size: 11px; text-align: right; }
+.fix-move.no-move { color: var(--muted); }
+.fix-m { color: var(--accent); }
+.fix-p { overflow-wrap: anywhere; }
+
+.fix-groups { margin-bottom: 12px; display: flex; flex-direction: column; gap: 7px; }
+.equiv-card {
+  border: 1px solid rgba(245, 165, 36, 0.45);
+  border-left: 3px solid var(--partial);
+  background: rgba(245, 165, 36, 0.07);
+  border-radius: 9px; padding: 8px 11px;
+}
+.equiv-members { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 5px; }
+.equiv-chip {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 99px; padding: 2px 9px; color: var(--text);
+}
+.equiv-note { font-size: 11.5px; color: #ffd88f; line-height: 1.6; }
+
+.fix-remain { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.remain-line {
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.6;
+  color: #ffb3b4; background: rgba(255, 107, 107, 0.07);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 7px; padding: 5px 9px; overflow-wrap: anywhere;
+}
+
+.fix-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn:disabled { opacity: .55; cursor: default; transform: none; }
